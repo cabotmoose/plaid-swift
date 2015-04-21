@@ -21,13 +21,13 @@ Plaid.initializePlaid(clientId: "Your client_id", secret: "Your secret", appStat
 
 > See [Functions](#functions)
 
-###Usage
+##Usage
 > *userType* and *institution* take an [Enum](#enums) as an input.
 
 > *Institutions* and *Accounts* returned by plaid-swift functions are [Structs](#structs) with various properties associated with each. [See below for more info](#structs).
 
 
-###Functions
+##Functions
 ####PS_addUser
 ```swift
 PS_addUser(userType: Type, username: String, password: String, institution: Institution) { (response, accessToken, error) -> () in
@@ -48,7 +48,7 @@ PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String
 }
 ```
 
-###Enums
+##Enums
 ####BaseURL 
 ```swift
 enum BaseURL {
@@ -81,7 +81,7 @@ public enum Type {
 }
 ```
 
-###Structs
+##Structs
 ####Institution
 ```swift
 public struct Transaction {
@@ -128,7 +128,7 @@ public struct Account {
 }
 ```
 
-###Known Issues
+##Known Issues
 ####Date bounding:
 Currently not working
 
