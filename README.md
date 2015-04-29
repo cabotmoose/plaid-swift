@@ -21,6 +21,8 @@ Plaid.initializePlaid(clientId: "Your client_id", secret: "Your secret", appStat
 
 > See [Functions](#functions)
 
+####MFA functionality working, check back for updated documentation
+
 ##Usage
 > *userType* and *institution* take an [Enum](#enums) as an input.
 
@@ -30,8 +32,12 @@ Plaid.initializePlaid(clientId: "Your client_id", secret: "Your secret", appStat
 ##Functions
 ####PS_addUser
 ```swift
-PS_addUser(userType: Type, username: String, password: String, institution: Institution) { (response, accessToken, error) -> () in
+PS_addUser(userType: Type, username: String, password: String, pin: String?, instiution: Institution) { (response, accessToken, mfaType, mfa, accounts, transactions, error) -> () in
+	//NOTE: pin param only required for USAA 
+
 	//Returns user access_token 
+
+	//Returns MFA requirements if valid
 }
 ```
 ####PS_getUserBalance
@@ -134,15 +140,19 @@ Currently not working
 
 ####Supported institutions:  
 1. American Express  
-2. Charles Schwab  
+2. Bank of America 
 3. Chase  
-4. Citi (connect only)  
-5. Fidelity  
-6. Wells Fargo  
+4. Citi  
+5. Wells Fargo  
+6. USAA (requires user PIN)
+7. US Bank
 
-####Upcoming institutions:
-Basically all those that require MFA to add:  
-1. Bank of America  
-2. Citi (auth)  
-3. US Bank  
-4. USAA  
+####Untested institutions 
+1. Charles Schwab
+2. Fidelity
+3. Silicon Valley Bank
+
+####Unsupported institutions (As of 28 April): 
+These are institutions with Plaid endpoints but no actual data yet. Check [Plaid](https://plaid.com) for additional info. 
+1. PNC
+2. Capital One 360
