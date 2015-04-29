@@ -25,6 +25,8 @@ struct Plaid {
     }
 }
 
+let session = NSURLSession.sharedSession()
+
 enum BaseURL {
     case Production
     case Testing
@@ -33,6 +35,7 @@ enum BaseURL {
 public enum Type {
     case Auth
     case Connect
+    case Balance
 }
 
 public enum Institution {
@@ -43,6 +46,7 @@ public enum Institution {
     case chase
     case citi
     case fidelity
+    case pnc
     case us
     case usaa
     case wells
@@ -133,75 +137,113 @@ public struct Transaction {
 
 //MARK: Add Connect or Auth User
 
-func PS_addUser(userType: Type, username: String, password: String, instiution: Institution, completion: (response: NSURLResponse?, accessToken:String, error:NSError?) -> ()) {
+func PS_addUser(userType: Type, username: String, password: String, pin: String?, instiution: Institution, completion: (response: NSURLResponse?, accessToken:String, mfaType:String?, mfa:[[String:AnyObject]]?, accounts: [Account]?, transactions: [Transaction]?, error:NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
     let secret = Plaid.secret!
     
-    var institutionStr: String {
-        switch instiution {
-        case .amex:
-            return "amex"
-        case .bofa:
-            return "bofa"
-        case .capone360:
-            return "capone360"
-        case .chase:
-            return "chase"
-        case .citi:
-            return "citi"
-        case .fidelity:
-            return "fidelity"
-        case .schwab:
-            return "schwab"
-        case .us:
-            return "us"
-        case .usaa:
-            return "usaa"
-        case .wells:
-            return "wells"
-        }
-    }
+    var institutionStr: String = institutionToString(institution: instiution)
     
-    let encodUsername = username.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
-    let encodPassword = password.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
     
     if userType == .Auth {
-        //let urlString:String = "\(baseURL)auth?client_id=\(clientId)&secret=\(secret)&username=\(encodUsername)&password=\(encodPassword)&type=\(institutionStr)"
-        let urlString:String = "\(baseURL)auth?client_id=test_id&secret=test_secret&username=\(encodUsername)&password=\(encodPassword)&type=\(institutionStr)"
-        let url:NSURL! = NSURL(string: urlString)
-        var request = NSMutableURLRequest(URL: url)
-        var session = NSURLSession.sharedSession()
-        request.HTTPMethod = "POST"
-        
-        let task = session.dataTaskWithRequest(request, completionHandler: {
-            data, response, error in
-            var error:NSError?
-            let jsonResult:NSDictionary? = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: &error) as? NSDictionary
-            if let token:String = jsonResult?.valueForKey("access_token") as? String {
-                completion(response: response, accessToken: token, error: error)
-            }
-        })
-        task.resume()
+        //Fill in for Auth call
         
     } else if userType == .Connect {
-        let urlString:String = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&username=\(encodUsername)&password=\(encodPassword)&type=\(institutionStr)"
-        //let urlString:String = "\(baseURL)connect?client_id=test_id&secret=test_secret&username=\(encodUsername)&password=\(encodPassword)&type=\(institutionStr)"
-        let url:NSURL! = NSURL(string: urlString)
+        
+        var optionsDict: [String:AnyObject] =
+        [
+            "list":true
+        ]
+        
+        let optionsDictStr = dictToString(optionsDict)
+        
+        var urlString:String?
+        if pin != nil {
+            urlString = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionStr)&\(optionsDictStr.encodValue)"
+        }
+        else {
+            urlString = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionStr)&options=\(optionsDictStr.encodValue)"
+            
+        }
+        
+        println("urlString: \(urlString!)")
+        
+        let url:NSURL! = NSURL(string: urlString!)
         var request = NSMutableURLRequest(URL: url)
-        var session = NSURLSession.sharedSession()
         request.HTTPMethod = "POST"
         
         let task = session.dataTaskWithRequest(request, completionHandler: {
             data, response, error in
             var error:NSError?
+            var mfaDict:[[String:AnyObject]]?
+            var type:String?
+            
             let jsonResult:NSDictionary? = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: &error) as? NSDictionary
+            
+            //println("jsonResult: \(jsonResult!)")
+            
             if let token:String = jsonResult?.valueForKey("access_token") as? String {
-                completion(response: response, accessToken: token, error: error)
+                if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String:AnyObject]] {
+                    let mfaTwo = mfaResponse[0]
+                    mfaDict = mfaResponse
+                    if let typeMfa = jsonResult!.valueForKey("type") as? String {
+                        type = typeMfa
+                    }
+                    completion(response: response, accessToken: token, mfaType: type, mfa: mfaDict, accounts: nil, transactions: nil, error: error)
+                } else {
+                    let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
+                    let accts = acctsArray.map{Account(account: $0)}
+                    let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
+                    let trxns = trxnArray.map{Transaction(transaction: $0)}
+                    
+                    completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
+                }
+            } else {
+                //Handle invalid cred login
             }
         })
         task.resume()
     }
+}
+
+//MARK: MFA funcs
+
+func PS_submitMFAResponse(accessToken: String, response: String, completion: (response: NSURLResponse?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
+    let baseURL = Plaid.baseURL!
+    let clientId = Plaid.clientId!
+    let secret = Plaid.secret!
+    
+    
+    let urlString:String = "\(baseURL)connect/step?client_id=\(clientId)&secret=\(secret)&access_token=\(accessToken)&mfa=\(response.encodValue)"
+    println("urlString: \(urlString)")
+    let url:NSURL! = NSURL(string: urlString)
+    var request = NSMutableURLRequest(URL: url)
+    request.HTTPMethod = "POST"
+    println("MFA request: \(request)")
+    
+    
+    let task = session.dataTaskWithRequest(request, completionHandler: {
+        data, response, error in
+        println("mfa response: \(response)")
+        println("mfa data: \(data)")
+        println(error)
+        var error:NSError?
+        let jsonResult:NSDictionary? = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: &error) as? NSDictionary
+        
+        if jsonResult?.valueForKey("accounts") != nil {
+            let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
+            let accts = acctsArray.map{Account(account: $0)}
+            let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
+            let trxns = trxnArray.map{Transaction(transaction: $0)}
+            
+            completion(response: response, accounts: accts, transactions: trxns, error: error)
+        }
+        
+        println("jsonResult: \(jsonResult!)")
+    })
+    task.resume()
+    
+    
 }
 
 
@@ -215,7 +257,7 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
     let urlString:String = "\(baseURL)balance?client_id=\(clientId)&secret=\(secret)&access_token=\(accessToken)"
     let url:NSURL! = NSURL(string: urlString)
     
-    let task = NSURLSession.sharedSession().dataTaskWithURL(url) {
+    let task = session.dataTaskWithURL(url) {
         data, response, error in
         var error: NSError?
         let jsonResult:NSDictionary? = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: &error) as? NSDictionary
@@ -247,11 +289,9 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
     }
     
     let optionsDictStr = dictToString(optionsDict)
-    let encodOptionsDict = optionsDictStr.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
-    let urlString:String = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&access_token=\(accessToken)&\(encodOptionsDict)"
+    let urlString:String = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&access_token=\(accessToken)&\(optionsDictStr.encodValue)"
     let url:NSURL = NSURL(string: urlString)!
     var request = NSMutableURLRequest(URL: url)
-    var session = NSURLSession.sharedSession()
     request.HTTPMethod = "POST"
     
     let task = NSURLSession.sharedSession().dataTaskWithURL(url) {
@@ -285,4 +325,46 @@ func dictToString(value: AnyObject) -> NSString {
         }
     }
     return ""
+}
+
+func institutionToString(#institution: Institution) -> String {
+    var institutionStr: String {
+        switch institution {
+        case .amex:
+            return "amex"
+        case .bofa:
+            return "bofa"
+        case .capone360:
+            return "capone360"
+        case .chase:
+            return "chase"
+        case .citi:
+            return "citi"
+        case .fidelity:
+            return "fidelity"
+        case .pnc:
+            return "pnc"
+        case .schwab:
+            return "schwab"
+        case .us:
+            return "us"
+        case .usaa:
+            return "usaa"
+        case .wells:
+            return "wells"
+        }
+    }
+    return institutionStr
+}
+
+extension String {
+    var encodValue:String {
+        return self.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
+    }
+}
+
+extension NSString {
+    var encodValue:String {
+        return self.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
+    }
 }
