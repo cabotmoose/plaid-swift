@@ -132,9 +132,9 @@ public struct Account {
     let lastFourDigits: String
     //Optional properties
     let limit: NSNumber?
-    let routingNumber: String? -- Only for Auth endpoint
-    let accountNumber: String? -- Only for Auth endpoint
-    let wireRouting: String? -- Only for Auth endpoint
+    let routingNumber: String? // Only for Auth endpoint
+    let accountNumber: String? // Only for Auth endpoint
+    let wireRouting: String? // Only for Auth endpoint
     ...
 }
 ```
