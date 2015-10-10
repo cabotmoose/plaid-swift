@@ -13,7 +13,8 @@ struct Plaid {
     static var baseURL: String!
     static var clientID: String!
     static var secret: String!
-    
+
+    @available(*, deprecated, message="Use initializePlaidWithClientID(_:) instead.")
     static func initializePlaid(clientID: String, secret: String, appStatus: BaseURL) {
         Plaid.clientID = clientID
         Plaid.secret = secret
@@ -23,6 +24,20 @@ struct Plaid {
             baseURL = "https://api.plaid.com/"
         case .Testing:
             baseURL = "https://tartan.plaid.com/"
+        }
+    }
+
+    static func initializePlaidWithClientID(clientID: String, secretKey: String, inProduction: Bool) {
+        if !inProduction {
+            Plaid.baseURL = "https://tartan.plaid.com/"
+            Plaid.clientID = "test_id"
+            Plaid.secret = "test_secret"
+        }
+
+        if inProduction {
+            Plaid.baseURL = "https://api.plaid.com/"
+            Plaid.clientID = clientID
+            Plaid.secret = secretKey
         }
     }
 }
@@ -154,40 +169,39 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
     let optionsDictionary: [String: AnyObject] = ["list": true]
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
     
-    var urlString: String?
+    var URLString: String?
     if pin != nil {
-        urlString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionString)&\(optionsDictionaryString.encodValue)"
+        URLString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionString)&\(optionsDictionaryString.encodValue)"
     } else {
-        urlString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionString)&options=\(optionsDictionaryString.encodValue)"
+        URLString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionString)&options=\(optionsDictionaryString.encodValue)"
     }
     
-    let url = NSURL(string: urlString!)
+    let url = NSURL(string: URLString!)
     let request = NSMutableURLRequest(URL: url!)
     request.HTTPMethod = "POST"
     
-    let task = session.dataTaskWithRequest(request, completionHandler: {
-        data, response, error in
+    let task = session.dataTaskWithRequest(request, completionHandler: { data, response, error in
         var mfaDictionary: [[String: AnyObject]]?
         var type: String?
         
         do {
-            let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
-            guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
-            guard jsonResult!.valueForKey("code") as? Int != 1200 else {throw PlaidError.InvalidCredentials(jsonResult!.valueForKey("resolve") as! String)}
-            guard jsonResult!.valueForKey("code") as? Int != 1005 else {throw PlaidError.CredentialsMissing(jsonResult!.valueForKey("resolve") as! String)}
-            guard jsonResult!.valueForKey("code") as? Int != 1601 else {throw PlaidError.InstitutionNotAvailable}
+            let JSONResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+            guard JSONResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
+            guard JSONResult!.valueForKey("code") as? Int != 1200 else {throw PlaidError.InvalidCredentials(JSONResult!.valueForKey("resolve") as! String)}
+            guard JSONResult!.valueForKey("code") as? Int != 1005 else {throw PlaidError.CredentialsMissing(JSONResult!.valueForKey("resolve") as! String)}
+            guard JSONResult!.valueForKey("code") as? Int != 1601 else {throw PlaidError.InstitutionNotAvailable}
             
-            if let token = jsonResult?.valueForKey("access_token") as? String {
-                if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String: AnyObject]] {
+            if let token = JSONResult?.valueForKey("access_token") as? String {
+                if let mfaResponse = JSONResult!.valueForKey("mfa") as? [[String: AnyObject]] {
                     mfaDictionary = mfaResponse
-                    if let typeMfa = jsonResult!.valueForKey("type") as? String {
+                    if let typeMfa = JSONResult!.valueForKey("type") as? String {
                         type = typeMfa
                     }
                     completion(response: response, accessToken: token, mfaType: type, mfa: mfaDictionary, accounts: nil, transactions: nil, error: error)
                 } else {
-                    let acctsArray: [[String: AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String: AnyObject]]
+                    let acctsArray: [[String: AnyObject]] = JSONResult?.valueForKey("accounts") as! [[String: AnyObject]]
                     let accts = acctsArray.map{Account(account: $0)}
-                    let trxnArray: [[String: AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String: AnyObject]]
+                    let trxnArray: [[String: AnyObject]] = JSONResult?.valueForKey("transactions") as! [[String: AnyObject]]
                     let trxns = trxnArray.map{Transaction(transaction: $0)}
                     
                     completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
@@ -202,35 +216,31 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
 }
 
 // MARK: - MFA funcs
-
 func PS_submitMFAResponse(accessToken: String, code: Bool?, response: String, completion: (response: NSURLResponse?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
-    var urlString: String?
+    var URLString: String?
     
     let optionsDictionary: [String: AnyObject] = ["send_method":["type":response]]
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
     
     if code == true {
-        urlString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&options=\(optionsDictionaryString.encodValue)"
-        print("urlString: \(urlString!)")
+        URLString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&options=\(optionsDictionaryString.encodValue)"
+        print("urlString: \(URLString!)")
     } else {
-        urlString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&mfa=\(response.encodValue)"
+        URLString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&mfa=\(response.encodValue)"
     }
-    
-    let url = NSURL(string: urlString!)
-    let request = NSMutableURLRequest(URL: url!)
+
+    let request = NSMutableURLRequest(URL: NSURL(string: URLString!)!)
     request.HTTPMethod = "POST"
     
-    let task = session.dataTaskWithRequest(request, completionHandler: {
-        data, response, error in
-        
+    let task = session.dataTaskWithRequest(request, completionHandler: { data, response, error in
         do {
-            let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
-            guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
-            guard jsonResult?.valueForKey("code") as? Int != 1203 else { throw PlaidError.IncorrectMfa(jsonResult!.valueForKey("resolve") as! String)}
-            guard jsonResult?.valueForKey("accounts") != nil else { throw JSONError.Empty }
-            let acctsArray: [[String: AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String: AnyObject]]
+            let JSONResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+            guard JSONResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
+            guard JSONResult?.valueForKey("code") as? Int != 1203 else { throw PlaidError.IncorrectMfa(JSONResult!.valueForKey("resolve") as! String)}
+            guard JSONResult?.valueForKey("accounts") != nil else { throw JSONError.Empty }
+            let acctsArray: [[String: AnyObject]] = JSONResult?.valueForKey("accounts") as! [[String: AnyObject]]
             let accts = acctsArray.map{Account(account: $0)}
-            let trxnArray: [[String: AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String: AnyObject]]
+            let trxnArray: [[String: AnyObject]] = JSONResult?.valueForKey("transactions") as! [[String: AnyObject]]
             let trxns = trxnArray.map{Transaction(transaction: $0)}
             
             completion(response: response, accounts: accts, transactions: trxns, error: error)
@@ -242,25 +252,21 @@ func PS_submitMFAResponse(accessToken: String, code: Bool?, response: String, co
     task.resume()
 }
 
-
 // MARK: - Get balance
 func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse?, accounts:[Account], error:NSError?) -> ()) {
 
-    let urlString = "\(Plaid.baseURL!)balance?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)"
-    let url = NSURL(string: urlString)
-    
-    let task = session.dataTaskWithURL(url!) {
-        data, response, error in
-        
+    let URLString = "\(Plaid.baseURL!)balance?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)"
+
+    let task = session.dataTaskWithURL(NSURL(string: URLString)!) { data, response, error in
         do {
-            let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
-            print("jsonResult: \(jsonResult!)")
-            guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
-            guard jsonResult?.valueForKey("code") as? Int != 1105 else { throw PlaidError.BadAccessToken }
-            guard let dataArray: [[String: AnyObject]] = jsonResult?.valueForKey("accounts") as? [[String : AnyObject]] else { throw JSONError.Empty }
+            let JSONResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+            print("JSONResult: \(JSONResult!)")
+            guard JSONResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
+            guard JSONResult?.valueForKey("code") as? Int != 1105 else { throw PlaidError.BadAccessToken }
+            guard let dataArray: [[String: AnyObject]] = JSONResult?.valueForKey("accounts") as? [[String : AnyObject]] else { throw JSONError.Empty }
             let userAccounts = dataArray.map{Account(account: $0)}
+
             completion(response: response, accounts: userAccounts, error: error)
-            
         } catch {
             print("JSON parsing error (PS_getUserBalance): \(error)")
         }
@@ -271,7 +277,7 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
 
 // MARK: - Get transactions (Connect)
 func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String?, endDate: String?, completion: (response: NSURLResponse?, transactions: [Transaction], error:NSError?) -> ()) {
-    
+
     var optionsDictionary: [String: AnyObject] = ["pending": true]
     
     if let beginDate = beginDate {
@@ -283,16 +289,16 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
     }
     
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
-    let urlString:String = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&\(optionsDictionaryString.encodValue)"
-    let url: NSURL = NSURL(string: urlString)!
-    let request = NSMutableURLRequest(URL: url)
+    let URLString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&\(optionsDictionaryString.encodValue)"
+    let URL = NSURL(string: URLString)!
+    let request = NSMutableURLRequest(URL: URL)
     request.HTTPMethod = "POST"
     
-    let task = NSURLSession.sharedSession().dataTaskWithURL(url) { data, response, error in
+    let task = NSURLSession.sharedSession().dataTaskWithURL(URL) { data, response, error in
         do {
-            let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
-            guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
-            guard let dataArray: [[String: AnyObject]] = jsonResult?.valueForKey("transactions") as? [[String: AnyObject]] else { throw JSONError.Empty }
+            let JSONResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+            guard JSONResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
+            guard let dataArray: [[String: AnyObject]] = JSONResult?.valueForKey("transactions") as? [[String: AnyObject]] else { throw JSONError.Empty }
             let userTransactions = dataArray.map{Transaction(transaction: $0)}
             completion(response: response, transactions: userTransactions, error: error)
         } catch {
@@ -304,7 +310,7 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
 }
 
 
-// MARK: - Helper funcs
+// MARK: - Helper Methods
 enum JSONError: ErrorType {
     case Writing
     case Reading
@@ -319,13 +325,12 @@ enum PlaidError: ErrorType {
     case InstitutionNotAvailable
 }
 
-
 func plaidDateFormatter(date: NSDate) -> String {
     let dateFormatter = NSDateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd"
-    let dateStr = dateFormatter.stringFromDate(date)
+    let dateString = dateFormatter.stringFromDate(date)
 
-    return dateStr
+    return dateString
 }
 
 func dictionaryToString(value: AnyObject) -> NSString {
