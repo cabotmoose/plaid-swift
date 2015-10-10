@@ -56,8 +56,8 @@ PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String
 ####BaseURL 
 ```swift
 enum BaseURL {
-    case Production //Endpoint: https://tartan.plaid.com
-    case Testing    //Endpoint: https://api.plaid.com
+    case Production //Endpoint: https://api.plaid.com
+    case Testing    //Endpoint: https://tartan.plaid.com
 }
 ```
 
