@@ -21,8 +21,6 @@ Plaid.initializePlaid(clientId: "Your client_id", secret: "Your secret", appStat
 
 > See [Functions](#functions)
 
-####MFA functionality working, check back for updated documentation
-
 ##Usage
 > *userType* and *institution* take an [Enum](#enums) as an input.
 
@@ -73,6 +71,10 @@ public enum Institution {
     case chase
     case citi
     case fidelity
+    case navy
+    case pnc
+    case suntrust
+    case tdbank
     case us
     case usaa
     case wells
@@ -130,6 +132,9 @@ public struct Account {
     let lastFourDigits: String
     //Optional properties
     let limit: NSNumber?
+    let routingNumber: String? -- Only for Auth endpoint
+    let accountNumber: String? -- Only for Auth endpoint
+    let wireRouting: String? -- Only for Auth endpoint
     ...
 }
 ```
@@ -150,10 +155,12 @@ Currently not working
 ####Untested institutions 
 1. Charles Schwab
 2. Fidelity
-3. Silicon Valley Bank
+3. Navy Federal Credit Union
+4. PNC
+5. Suntrust
+6. TD Bank
 
-####Unsupported institutions (As of 28 April): 
+####Unsupported institutions (As of 10 Oct): 
 These are institutions with Plaid endpoints but no actual data yet. Check [Plaid](https://plaid.com) for additional info. 
 
-1. PNC
-2. Capital One 360
+1. Capital One 360
