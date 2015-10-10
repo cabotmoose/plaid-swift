@@ -68,10 +68,10 @@ public struct Account {
     let accountNumber: String?
     let wireRouting: String?
     
-    public init (account: [String:AnyObject]) {
-        let meta = account["meta"] as! [String:AnyObject]
-        let accountBalance = account["balance"] as! [String:AnyObject]
-        let numbers = account["numbers"] as? [String:AnyObject]
+    public init (account: [String: AnyObject]) {
+        let meta = account["meta"] as! [String: AnyObject]
+        let accountBalance = account["balance"] as! [String: AnyObject]
+        let numbers = account["numbers"] as? [String: AnyObject]
         
         institutionName = account["institution_type"] as! String
         id = account["_id"] as! String
@@ -111,13 +111,13 @@ public struct Transaction {
     
     let category: NSArray?
     
-    public init(transaction: [String:AnyObject]) {
-        let meta = transaction["meta"] as! [String:AnyObject]
-        let location = meta["location"] as? [String:AnyObject]
-        let coordinates = location?["coordinates"] as? [String:AnyObject]
-        let score = transaction["score"] as? [String:AnyObject]
-        let locationScore = score?["location"] as? [String:AnyObject]
-        let type = transaction["type"] as? [String:AnyObject]
+    public init(transaction: [String: AnyObject]) {
+        let meta = transaction["meta"] as! [String: AnyObject]
+        let location = meta["location"] as? [String: AnyObject]
+        let coordinates = location?["coordinates"] as? [String: AnyObject]
+        let score = transaction["score"] as? [String: AnyObject]
+        let locationScore = score?["location"] as? [String: AnyObject]
+        let type = transaction["type"] as? [String: AnyObject]
         
         account = transaction["_account"] as! String
         id = transaction["_id"] as! String
@@ -147,25 +147,21 @@ public struct Transaction {
 }
 
 // MARK: - Add Connect or Auth User
-func PS_addUser(userType: Type, username: String, password: String, pin: String?, institution: Institution, completion: (response: NSURLResponse?, accessToken:String, mfaType:String?, mfa:[[String:AnyObject]]?, accounts: [Account]?, transactions: [Transaction]?, error:NSError?) -> ()) {
+func PS_addUser(userType: Type, username: String, password: String, pin: String?, institution: Institution, completion: (response: NSURLResponse?, accessToken: String, mfaType: String?, mfa:[[String: AnyObject]]?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
     let secret = Plaid.secret!
     
     let institutionStr: String = institutionToString(institution)
     
-    let optionsDict: [String:AnyObject] =
-    [
-        "list":true
-    ]
+    let optionsDict: [String: AnyObject] = ["list":true]
     
     let optionsDictStr = dictToString(optionsDict)
     
     var urlString:String?
     if pin != nil {
         urlString = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionStr)&\(optionsDictStr.encodValue)"
-    }
-    else {
+    } else {
         urlString = "\(baseURL)connect?client_id=\(clientId)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionStr)&options=\(optionsDictStr.encodValue)"
     }
     
@@ -175,7 +171,7 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
     
     let task = session.dataTaskWithRequest(request, completionHandler: {
         data, response, error in
-        var mfaDict:[[String:AnyObject]]?
+        var mfaDict:[[String: AnyObject]]?
         var type:String?
         
         do {
@@ -186,16 +182,16 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
             guard jsonResult!.valueForKey("code") as? Int != 1601 else {throw PlaidError.InstitutionNotAvailable}
             
             if let token:String = jsonResult?.valueForKey("access_token") as? String {
-                if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String:AnyObject]] {
+                if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String: AnyObject]] {
                     mfaDict = mfaResponse
                     if let typeMfa = jsonResult!.valueForKey("type") as? String {
                         type = typeMfa
                     }
                     completion(response: response, accessToken: token, mfaType: type, mfa: mfaDict, accounts: nil, transactions: nil, error: error)
                 } else {
-                    let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
+                    let acctsArray:[[String: AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String: AnyObject]]
                     let accts = acctsArray.map{Account(account: $0)}
-                    let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
+                    let trxnArray:[[String: AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String: AnyObject]]
                     let trxns = trxnArray.map{Transaction(transaction: $0)}
                     
                     completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
@@ -203,12 +199,11 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
             } else {
                 //Handle invalid cred login
             }
-            
         } catch {
             print("Error (PS_addUser): \(error)")
         }
-        
     })
+
     task.resume()
 }
 
@@ -218,13 +213,9 @@ func PS_submitMFAResponse(accessToken: String, code:Bool?, response: String, com
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
     let secret = Plaid.secret!
-    var urlString:String?
+    var urlString: String?
     
-    let optionsDict: [String:AnyObject] =
-    [
-        "send_method":["type":response]
-    ]
-    
+    let optionsDict: [String: AnyObject] = ["send_method":["type":response]]
     let optionsDictStr = dictToString(optionsDict)
     
     if code == true {
@@ -245,10 +236,10 @@ func PS_submitMFAResponse(accessToken: String, code:Bool?, response: String, com
             let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
             guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
             guard jsonResult?.valueForKey("code") as? Int != 1203 else { throw PlaidError.IncorrectMfa(jsonResult!.valueForKey("resolve") as! String)}
-            guard jsonResult?.valueForKey("accounts") != nil else { throw JsonError.Empty }
-            let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
+            guard jsonResult?.valueForKey("accounts") != nil else { throw JSONError.Empty }
+            let acctsArray:[[String: AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String: AnyObject]]
             let accts = acctsArray.map{Account(account: $0)}
-            let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
+            let trxnArray:[[String: AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String: AnyObject]]
             let trxns = trxnArray.map{Transaction(transaction: $0)}
             
             completion(response: response, accounts: accts, transactions: trxns, error: error)
@@ -278,7 +269,7 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
             print("jsonResult: \(jsonResult!)")
             guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
             guard jsonResult?.valueForKey("code") as? Int != 1105 else { throw PlaidError.BadAccessToken }
-            guard let dataArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as? [[String : AnyObject]] else { throw JsonError.Empty }
+            guard let dataArray:[[String: AnyObject]] = jsonResult?.valueForKey("accounts") as? [[String : AnyObject]] else { throw JSONError.Empty }
             let userAccounts = dataArray.map{Account(account: $0)}
             completion(response: response, accounts: userAccounts, error: error)
             
@@ -286,20 +277,17 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
             print("JSON parsing error (PS_getUserBalance): \(error)")
         }
     }
+
     task.resume()
 }
 
 // MARK: - Get transactions (Connect)
-
-func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String?, endDate: String?, completion: (response: NSURLResponse?, transactions:[Transaction], error:NSError?) -> ()) {
+func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String?, endDate: String?, completion: (response: NSURLResponse?, transactions: [Transaction], error:NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
     let secret = Plaid.secret!
     
-    var optionsDict: [String:AnyObject] =
-    [
-        "pending": true
-    ]
+    var optionsDict: [String: AnyObject] = ["pending": true]
     
     if let beginDate = beginDate {
         optionsDict["gte"] = beginDate
@@ -321,27 +309,26 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
         do {
             let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
             guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
-            guard let dataArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as? [[String:AnyObject]] else { throw JsonError.Empty }
+            guard let dataArray:[[String: AnyObject]] = jsonResult?.valueForKey("transactions") as? [[String: AnyObject]] else { throw JSONError.Empty }
             let userTransactions = dataArray.map{Transaction(transaction: $0)}
             completion(response: response, transactions: userTransactions, error: error)
         } catch {
             print("JSON parsing error (PS_getUserTransactions: \(error)")
         }
     }
+
     task.resume()
-    
 }
 
 
 // MARK: - Helper funcs
-
-enum JsonError:ErrorType {
+enum JSONError: ErrorType {
     case Writing
     case Reading
     case Empty
 }
 
-enum PlaidError:ErrorType {
+enum PlaidError: ErrorType {
     case BadAccessToken
     case CredentialsMissing(String)
     case InvalidCredentials(String)
@@ -354,6 +341,7 @@ func plaidDateFormatter(date: NSDate) -> String {
     let dateFormatter = NSDateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd"
     let dateStr = dateFormatter.stringFromDate(date)
+
     return dateStr
 }
 
@@ -369,6 +357,7 @@ func dictToString(value: AnyObject) -> NSString {
             print("JSON Parsing error")
         }
     }
+
     return ""
 }
 
@@ -409,13 +398,13 @@ func institutionToString(institution: Institution) -> String {
 }
 
 extension String {
-    var encodValue:String {
+    var encodValue: String {
         return self.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
     }
 }
 
 extension NSString {
-    var encodValue:String {
+    var encodValue: String {
         return self.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)!
     }
 }
