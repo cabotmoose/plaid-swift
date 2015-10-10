@@ -9,9 +9,10 @@
 import Foundation
 
 struct Plaid {
-    static var baseURL:String!
-    static var clientId:String!
-    static var secret:String!
+
+    static var baseURL: String!
+    static var clientId: String!
+    static var secret: String!
     
     static func initializePlaid(clientId: String, secret: String, appStatus: BaseURL) {
         Plaid.clientId = clientId
@@ -108,7 +109,7 @@ public struct Transaction {
     let locationScoreZip: Double?
     let nameScore: Double?
     
-    let category:NSArray?
+    let category: NSArray?
     
     public init(transaction: [String:AnyObject]) {
         let meta = transaction["meta"] as! [String:AnyObject]
@@ -145,8 +146,7 @@ public struct Transaction {
     
 }
 
-//MARK: Add Connect or Auth User
-
+// MARK: - Add Connect or Auth User
 func PS_addUser(userType: Type, username: String, password: String, pin: String?, institution: Institution, completion: (response: NSURLResponse?, accessToken:String, mfaType:String?, mfa:[[String:AnyObject]]?, accounts: [Account]?, transactions: [Transaction]?, error:NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
@@ -212,7 +212,7 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
     task.resume()
 }
 
-//MARK: MFA funcs
+// MARK: - MFA funcs
 
 func PS_submitMFAResponse(accessToken: String, code:Bool?, response: String, completion: (response: NSURLResponse?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
@@ -256,14 +256,12 @@ func PS_submitMFAResponse(accessToken: String, code:Bool?, response: String, com
             print("MFA error (PS_submitMFAResponse): \(error)")
         }
     })
+
     task.resume()
-    
-    
 }
 
 
-//MARK: Get balance
-
+// MARK: - Get balance
 func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse?, accounts:[Account], error:NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
     let clientId = Plaid.clientId!
@@ -291,7 +289,7 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
     task.resume()
 }
 
-//MARK: Get transactions (Connect)
+// MARK: - Get transactions (Connect)
 
 func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String?, endDate: String?, completion: (response: NSURLResponse?, transactions:[Transaction], error:NSError?) -> ()) {
     let baseURL = Plaid.baseURL!
@@ -335,7 +333,7 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
 }
 
 
-//MARK: Helper funcs
+// MARK: - Helper funcs
 
 enum JsonError:ErrorType {
     case Writing
