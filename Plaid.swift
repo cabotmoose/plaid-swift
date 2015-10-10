@@ -14,7 +14,7 @@ struct Plaid {
     static var clientID: String!
     static var secret: String!
 
-    @available(*, deprecated, message="Use initializePlaidWithClientID(_:) instead.")
+    @available(*, deprecated, message="Use initializePlaid(clientID:_, secretKey:_, inProduction:_) instead.")
     static func initializePlaid(clientID: String, secret: String, appStatus: BaseURL) {
         Plaid.clientID = clientID
         Plaid.secret = secret
@@ -27,7 +27,7 @@ struct Plaid {
         }
     }
 
-    static func initializePlaidWithClientID(clientID: String, secretKey: String, inProduction: Bool) {
+    static func initializePlaid(clientID clientID: String, secretKey: String, inProduction: Bool) {
         if !inProduction {
             Plaid.baseURL = "https://tartan.plaid.com/"
             Plaid.clientID = "test_id"
