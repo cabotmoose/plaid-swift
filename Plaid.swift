@@ -17,6 +17,7 @@ struct Plaid {
     static func initializePlaid(clientID: String, secret: String, appStatus: BaseURL) {
         Plaid.clientID = clientID
         Plaid.secret = secret
+
         switch appStatus {
         case .Production:
             baseURL = "https://api.plaid.com/"
@@ -148,23 +149,20 @@ public struct Transaction {
 
 // MARK: - Add Connect or Auth User
 func PS_addUser(userType: Type, username: String, password: String, pin: String?, institution: Institution, completion: (response: NSURLResponse?, accessToken: String, mfaType: String?, mfa:[[String: AnyObject]]?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
-    let baseURL = Plaid.baseURL!
-    let clientID = Plaid.clientID!
-    let secret = Plaid.secret!
-    
-    let institutionString: String = institutionToString(institution)
+
+    let institutionString = institutionToString(institution)
     let optionsDictionary: [String: AnyObject] = ["list": true]
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
     
     var urlString: String?
     if pin != nil {
-        urlString = "\(baseURL)connect?client_id=\(clientID)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionString)&\(optionsDictionaryString.encodValue)"
+        urlString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&pin=\(pin!)&type=\(institutionString)&\(optionsDictionaryString.encodValue)"
     } else {
-        urlString = "\(baseURL)connect?client_id=\(clientID)&secret=\(secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionString)&options=\(optionsDictionaryString.encodValue)"
+        urlString = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret)&username=\(username)&password=\(password.encodValue)&type=\(institutionString)&options=\(optionsDictionaryString.encodValue)"
     }
     
-    let url:NSURL! = NSURL(string: urlString!)
-    let request = NSMutableURLRequest(URL: url)
+    let url = NSURL(string: urlString!)
+    let request = NSMutableURLRequest(URL: url!)
     request.HTTPMethod = "POST"
     
     let task = session.dataTaskWithRequest(request, completionHandler: {
@@ -179,7 +177,7 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
             guard jsonResult!.valueForKey("code") as? Int != 1005 else {throw PlaidError.CredentialsMissing(jsonResult!.valueForKey("resolve") as! String)}
             guard jsonResult!.valueForKey("code") as? Int != 1601 else {throw PlaidError.InstitutionNotAvailable}
             
-            if let token: String = jsonResult?.valueForKey("access_token") as? String {
+            if let token = jsonResult?.valueForKey("access_token") as? String {
                 if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String: AnyObject]] {
                     mfaDictionary = mfaResponse
                     if let typeMfa = jsonResult!.valueForKey("type") as? String {
@@ -194,8 +192,6 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
                     
                     completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
                 }
-            } else {
-                //Handle invalid cred login
             }
         } catch {
             print("Error (PS_addUser): \(error)")
@@ -208,23 +204,20 @@ func PS_addUser(userType: Type, username: String, password: String, pin: String?
 // MARK: - MFA funcs
 
 func PS_submitMFAResponse(accessToken: String, code: Bool?, response: String, completion: (response: NSURLResponse?, accounts: [Account]?, transactions: [Transaction]?, error: NSError?) -> ()) {
-    let baseURL = Plaid.baseURL!
-    let clientID = Plaid.clientID!
-    let secret = Plaid.secret!
     var urlString: String?
     
     let optionsDictionary: [String: AnyObject] = ["send_method":["type":response]]
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
     
     if code == true {
-        urlString = "\(baseURL)connect/step?client_id=\(clientID)&secret=\(secret)&access_token=\(accessToken)&options=\(optionsDictionaryString.encodValue)"
+        urlString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&options=\(optionsDictionaryString.encodValue)"
         print("urlString: \(urlString!)")
     } else {
-        urlString = "\(baseURL)connect/step?client_id=\(clientID)&secret=\(secret)&access_token=\(accessToken)&mfa=\(response.encodValue)"
+        urlString = "\(Plaid.baseURL!)connect/step?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&mfa=\(response.encodValue)"
     }
     
-    let url: NSURL! = NSURL(string: urlString!)
-    let request = NSMutableURLRequest(URL: url)
+    let url = NSURL(string: urlString!)
+    let request = NSMutableURLRequest(URL: url!)
     request.HTTPMethod = "POST"
     
     let task = session.dataTaskWithRequest(request, completionHandler: {
@@ -252,14 +245,11 @@ func PS_submitMFAResponse(accessToken: String, code: Bool?, response: String, co
 
 // MARK: - Get balance
 func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse?, accounts:[Account], error:NSError?) -> ()) {
-    let baseURL = Plaid.baseURL!
-    let clientID = Plaid.clientID!
-    let secret = Plaid.secret!
+
+    let urlString = "\(Plaid.baseURL!)balance?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)"
+    let url = NSURL(string: urlString)
     
-    let urlString: String = "\(baseURL)balance?client_id=\(clientID)&secret=\(secret)&access_token=\(accessToken)"
-    let url: NSURL! = NSURL(string: urlString)
-    
-    let task = session.dataTaskWithURL(url) {
+    let task = session.dataTaskWithURL(url!) {
         data, response, error in
         
         do {
@@ -281,9 +271,6 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
 
 // MARK: - Get transactions (Connect)
 func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: String?, endDate: String?, completion: (response: NSURLResponse?, transactions: [Transaction], error:NSError?) -> ()) {
-    let baseURL = Plaid.baseURL!
-    let clientID = Plaid.clientID!
-    let secret = Plaid.secret!
     
     var optionsDictionary: [String: AnyObject] = ["pending": true]
     
@@ -296,14 +283,12 @@ func PS_getUserTransactions(accessToken: String, showPending: Bool, beginDate: S
     }
     
     let optionsDictionaryString = dictionaryToString(optionsDictionary)
-    let urlString:String = "\(baseURL)connect?client_id=\(clientID)&secret=\(secret)&access_token=\(accessToken)&\(optionsDictionaryString.encodValue)"
+    let urlString:String = "\(Plaid.baseURL!)connect?client_id=\(Plaid.clientID!)&secret=\(Plaid.secret!)&access_token=\(accessToken)&\(optionsDictionaryString.encodValue)"
     let url: NSURL = NSURL(string: urlString)!
     let request = NSMutableURLRequest(URL: url)
     request.HTTPMethod = "POST"
     
-    let task = NSURLSession.sharedSession().dataTaskWithURL(url) {
-        data, response, error in
-        
+    let task = NSURLSession.sharedSession().dataTaskWithURL(url) { data, response, error in
         do {
             let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
             guard jsonResult?.valueForKey("code") as? Int != 1303 else { throw PlaidError.InstitutionNotAvailable }
