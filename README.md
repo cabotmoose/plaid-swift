@@ -90,7 +90,7 @@ public enum Type {
 ```
 
 ##Structs
-####Institution
+####Transaction
 ```swift
 public struct Transaction {
 	//Standard properties
